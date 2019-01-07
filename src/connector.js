@@ -72,10 +72,42 @@ class BotiumConnectorBotpress {
               this.queueBotSays(botMsg)
             } else {
               body.responses && body.responses.forEach(r => {
-                if (r.type === 'text') {
+                if (r.type === 'carousel') {
+                  if (r.elements) {
+                    const botMsg = {
+                      sourceData: body,
+                      cards: r.elements.map(e => ({
+                        text: e.title,
+                        image: e.picture && { mediaUri: e.picture },
+                        buttons: e.buttons && e.buttons.map(b => ({
+                          text: b.title,
+                          payload: b.url
+                        }))
+                      })),
+                      messageText: r.elements.length === 1 && r.elements[0].title
+                    }
+                    this.queueBotSays(botMsg)
+                  }
+                } else if (r.type === 'file') {
+                  if (r.url) {
+                    const botMsg = {
+                      sourceData: body,
+                      media: [{
+                        mediaUri: r.url
+                      }]
+                    }
+                    this.queueBotSays(botMsg)
+                  }
+                } else if (r.text) {
                   const botMsg = {
                     sourceData: body,
                     messageText: r.text
+                  }
+                  if (r.quick_replies) {
+                    botMsg.buttons = r.quick_replies.map(qr => ({
+                      text: qr.title,
+                      payload: qr.payload
+                    }))
                   }
                   this.queueBotSays(botMsg)
                 }

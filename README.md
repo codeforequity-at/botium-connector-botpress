@@ -81,7 +81,3 @@ If set, this userId will be used. Otherwise, for each convo a new userId is gene
 
 ### BOTPRESS_USE_INTENT
 Set this to true for testing the resolved intents only instead of the output text
-
-## Open Issues and Restrictions
-
-* Only Text supported right now (input/output)

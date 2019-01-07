@@ -4,3 +4,4 @@ tell me a joke
 tell me a joke
 
 #bot
+Welcome to the Botium Demo

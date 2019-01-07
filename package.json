@@ -1,6 +1,6 @@
 {
   "name": "botium-connector-botpress",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Botium Connector for Botpress",
   "main": "dist/botium-connector-botpress-cjs.js",
   "module": "dist/botium-connector-botpress-es.js",
