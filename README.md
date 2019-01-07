@@ -58,8 +58,8 @@ Open the file _botium.json_ in your working directory and add the Botpress chatb
     "Capabilities": {
       "PROJECTNAME": "<whatever>",
       "CONTAINERMODE": "botpress",
-      "BOTPRESS_SERVER_URL": "http://ec2-63-32-190-175.eu-west-1.compute.amazonaws.com:3001",
-      "BOTPRESS_BOTID": "small-talk-bot"
+      "BOTPRESS_SERVER_URL": "...",
+      "BOTPRESS_BOTID": "..."
     }
   }
 }
