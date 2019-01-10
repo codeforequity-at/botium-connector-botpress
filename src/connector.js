@@ -34,6 +34,20 @@ class BotiumConnectorBotpress {
     } else {
       this.userId = uuidv4()
     }
+    const pingUrl = `${this.caps[Capabilities.BOTPRESS_SERVER_URL]}/api/v1/bots/${this.caps[Capabilities.BOTPRESS_BOTID]}/converse/${this.userId}`
+    return new Promise((resolve, reject) => {
+      request({
+        uri: pingUrl,
+        method: 'GET'
+      }, (err, response, body) => {
+        if (err) {
+          [debug, reject].forEach(fn => fn(`error on url check ${pingUrl}: ${err}`))
+        } else {
+          debug(`success on url check ${pingUrl}`)
+          resolve()
+        }
+      })
+    })
   }
 
   UserSays (msg) {
@@ -86,7 +100,7 @@ class BotiumConnectorBotpress {
                       })),
                       messageText: r.elements.length === 1 && r.elements[0].title
                     }
-                    this.queueBotSays(botMsg)
+                    setTimeout(() => this.queueBotSays(botMsg), 0)
                   }
                 } else if (r.type === 'file') {
                   if (r.url) {
@@ -96,7 +110,7 @@ class BotiumConnectorBotpress {
                         mediaUri: r.url
                       }]
                     }
-                    this.queueBotSays(botMsg)
+                    setTimeout(() => this.queueBotSays(botMsg), 0)
                   }
                 } else if (r.text) {
                   const botMsg = {
@@ -109,7 +123,7 @@ class BotiumConnectorBotpress {
                       payload: qr.payload
                     }))
                   }
-                  this.queueBotSays(botMsg)
+                  setTimeout(() => this.queueBotSays(botMsg), 0)
                 }
               })
             }
