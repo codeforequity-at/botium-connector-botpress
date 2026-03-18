@@ -1,5 +1,4 @@
 const util = require('util')
-const request = require('request')
 const uuidv4 = require('uuid/v4')
 const debug = require('debug')('botium-connector-botpress')
 
@@ -35,19 +34,19 @@ class BotiumConnectorBotpress {
       this.userId = uuidv4()
     }
     const pingUrl = `${this.caps[Capabilities.BOTPRESS_SERVER_URL]}/api/v1/bots/${this.caps[Capabilities.BOTPRESS_BOTID]}/converse/${this.userId}`
-    return new Promise((resolve, reject) => {
-      request({
-        uri: pingUrl,
-        method: 'GET'
-      }, (err, response, body) => {
-        if (err) {
-          [debug, reject].forEach(fn => fn(`error on url check ${pingUrl}: ${err}`))
-        } else {
-          debug(`success on url check ${pingUrl}`)
-          resolve()
-        }
-      })
+    return fetch(pingUrl, {
+      method: 'GET'
     })
+      .then(response => {
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+        debug(`success on url check ${pingUrl}`)
+      })
+      .catch(err => {
+        debug(`error on url check ${pingUrl}: ${err}`)
+        throw err
+      })
   }
 
   UserSays (msg) {
@@ -60,77 +59,84 @@ class BotiumConnectorBotpress {
     this.userId = null
   }
 
-  _doRequest (msg) {
-    return new Promise((resolve, reject) => {
-      const requestOptions = this._buildRequest(msg)
-      debug(`constructed requestOptions ${JSON.stringify(requestOptions, null, 2)}`)
+  async _doRequest (msg) {
+    const requestOptions = this._buildRequest(msg)
+    debug(`constructed requestOptions ${JSON.stringify(requestOptions, null, 2)}`)
 
-      request(requestOptions, (err, response, body) => {
-        if (err) {
-          reject(new Error(`rest request failed: ${util.inspect(err)}`))
-        } else {
-          if (response.statusCode >= 400) {
-            debug(`got error response: ${response.statusCode}/${response.statusMessage}`)
-            return reject(new Error(`got error response: ${response.statusCode}/${response.statusMessage}`))
+    try {
+      const response = await fetch(requestOptions.uri, {
+        method: requestOptions.method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestOptions.body)
+      })
+
+      if (!response.ok) {
+        debug(`got error response: ${response.status}/${response.statusText}`)
+        throw new Error(`got error response: ${response.status}/${response.statusText}`)
+      }
+
+      const body = await response.json()
+
+      if (body) {
+        debug(`got response body: ${JSON.stringify(body, null, 2)}`)
+
+        if (this.caps[Capabilities.BOTPRESS_USE_INTENT]) {
+          const botMsg = {
+            sourceData: body,
+            messageText: body.nlu && body.nlu.intent && body.nlu.intent.name
           }
-          resolve(this)
-
-          if (body) {
-            debug(`got response body: ${JSON.stringify(body, null, 2)}`)
-
-            if (this.caps[Capabilities.BOTPRESS_USE_INTENT]) {
+          this.queueBotSays(botMsg)
+        } else {
+          body.responses && body.responses.forEach(r => {
+            if (r.type === 'carousel') {
+              if (r.elements) {
+                const botMsg = {
+                  sourceData: body,
+                  cards: r.elements.map(e => ({
+                    text: e.title,
+                    image: e.picture && { mediaUri: e.picture },
+                    buttons: e.buttons && e.buttons.map(b => ({
+                      text: b.title,
+                      payload: b.url
+                    }))
+                  })),
+                  messageText: r.elements.length === 1 && r.elements[0].title
+                }
+                setTimeout(() => this.queueBotSays(botMsg), 0)
+              }
+            } else if (r.type === 'file') {
+              if (r.url) {
+                const botMsg = {
+                  sourceData: body,
+                  media: [{
+                    mediaUri: r.url
+                  }]
+                }
+                setTimeout(() => this.queueBotSays(botMsg), 0)
+              }
+            } else if (r.text) {
               const botMsg = {
                 sourceData: body,
-                messageText: body.nlu && body.nlu.intent && body.nlu.intent.name
+                messageText: r.text
               }
-              this.queueBotSays(botMsg)
-            } else {
-              body.responses && body.responses.forEach(r => {
-                if (r.type === 'carousel') {
-                  if (r.elements) {
-                    const botMsg = {
-                      sourceData: body,
-                      cards: r.elements.map(e => ({
-                        text: e.title,
-                        image: e.picture && { mediaUri: e.picture },
-                        buttons: e.buttons && e.buttons.map(b => ({
-                          text: b.title,
-                          payload: b.url
-                        }))
-                      })),
-                      messageText: r.elements.length === 1 && r.elements[0].title
-                    }
-                    setTimeout(() => this.queueBotSays(botMsg), 0)
-                  }
-                } else if (r.type === 'file') {
-                  if (r.url) {
-                    const botMsg = {
-                      sourceData: body,
-                      media: [{
-                        mediaUri: r.url
-                      }]
-                    }
-                    setTimeout(() => this.queueBotSays(botMsg), 0)
-                  }
-                } else if (r.text) {
-                  const botMsg = {
-                    sourceData: body,
-                    messageText: r.text
-                  }
-                  if (r.quick_replies) {
-                    botMsg.buttons = r.quick_replies.map(qr => ({
-                      text: qr.title,
-                      payload: qr.payload
-                    }))
-                  }
-                  setTimeout(() => this.queueBotSays(botMsg), 0)
-                }
-              })
+              if (r.quick_replies) {
+                botMsg.buttons = r.quick_replies.map(qr => ({
+                  text: qr.title,
+                  payload: qr.payload
+                }))
+              }
+              setTimeout(() => this.queueBotSays(botMsg), 0)
             }
-          }
+          })
         }
-      })
-    })
+      }
+
+      return this
+    } catch (err) {
+      throw new Error(`rest request failed: ${util.inspect(err)}`)
+    }
   }
 
   _buildRequest (msg) {
@@ -139,7 +145,6 @@ class BotiumConnectorBotpress {
     const requestOptions = {
       uri,
       method: 'POST',
-      json: true,
       body: {
         type: 'text',
         text: msg.messageText
